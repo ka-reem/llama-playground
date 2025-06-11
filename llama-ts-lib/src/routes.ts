@@ -117,14 +117,50 @@ export async function handleChatCompletion(req: Request, res: Response): Promise
  */
 export async function handleGetModels(req: Request, res: Response): Promise<void> {
   try {
-    // This is a mock response since the actual models endpoint might vary
-    // You should replace this with the actual models API call when available
+    // Available Llama models with their specifications
     const models = [
-      'Llama-4-Maverick-17B-128E-Instruct-FP8',
-      'llama3.1-70b-instruct',
-      'llama3.1-405b-instruct',
-      'llama3.2-1b-instruct',
-      'llama3.2-3b-instruct',
+      {
+        id: 'Llama-4-Scout-17B-16E-Instruct-FP8',
+        name: 'Llama 4 Scout 17B 16E Instruct (FP8)',
+        input: 'Text, image',
+        output: 'Text',
+        provider: 'Meta'
+      },
+      {
+        id: 'Cerebras-Llama-4-Scout-17B-16E-Instruct',
+        name: 'Cerebras Llama 4 Scout 17B 16E Instruct',
+        input: 'Text',
+        output: 'Text',
+        provider: 'Cerebras'
+      },
+      {
+        id: 'Llama-4-Maverick-17B-128E-Instruct-FP8',
+        name: 'Llama 4 Maverick 17B 128E Instruct (FP8)',
+        input: 'Text, image',
+        output: 'Text',
+        provider: 'Meta'
+      },
+      {
+        id: 'Groq-Llama-4-Maverick-17B-128E-Instruct',
+        name: 'Groq Llama 4 Maverick 17B 128E Instruct',
+        input: 'Text',
+        output: 'Text',
+        provider: 'Groq'
+      },
+      {
+        id: 'Llama-3.3-70B-Instruct',
+        name: 'Llama 3.3 70B Instruct',
+        input: 'Text',
+        output: 'Text',
+        provider: 'Meta'
+      },
+      {
+        id: 'Llama-3.3-8B-Instruct',
+        name: 'Llama 3.3 8B Instruct',
+        input: 'Text',
+        output: 'Text',
+        provider: 'Meta'
+      }
     ];
 
     res.json({ models });
