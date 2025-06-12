@@ -1,18 +1,17 @@
 import { Request, Response } from 'express';
 import LlamaAPIClient from 'llama-api-client';
+import type { Message, MessageTextContentItem, MessageImageContentItem, UserMessage, SystemMessage, CompletionMessage } from 'llama-api-client/resources/chat';
+import multer from 'multer';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 // Initialize the Llama API client
 const client = new LlamaAPIClient({
   apiKey: process.env.LLAMA_API_KEY || 'your-api-key-here',
 });
 
-export interface ChatMessage {
-  content: string;
-  role: 'user' | 'assistant' | 'system';
-}
-
 export interface ChatRequest {
-  messages: ChatMessage[];
+  messages: Message[];
   model?: string;
   stream?: boolean;
 }
@@ -51,6 +50,24 @@ export async function handleChatCompletion(req: Request, res: Response): Promise
           error: 'Each message must have content and role properties' 
         });
         return;
+      }
+      
+      // Additional validation for array content
+      if (Array.isArray(message.content)) {
+        for (const item of message.content) {
+          if (item.type === 'text' && !item.text) {
+            res.status(400).json({ 
+              error: 'Text content items must have text property' 
+            });
+            return;
+          }
+          if (item.type === 'image_url' && !item.image_url?.url) {
+            res.status(400).json({ 
+              error: 'Image content items must have image_url.url property' 
+            });
+            return;
+          }
+        }
       }
     }
 
@@ -182,4 +199,56 @@ export function handleHealthCheck(req: Request, res: Response): void {
     timestamp: new Date().toISOString(),
     service: 'llama-api-frontend'
   });
+}
+
+// Configure multer for image uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept only image files
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      const error = new Error('Only image files are allowed') as any;
+      cb(error, false);
+    }
+  },
+});
+
+/**
+ * Handle image upload
+ */
+export const uploadImage = upload.single('image');
+
+export async function handleImageUpload(req: Request, res: Response): Promise<void> {
+  try {
+    if (!req.file) {
+      res.status(400).json({
+        error: 'No image file provided'
+      });
+      return;
+    }
+
+    // Convert image to base64 data URL
+    const base64Image = req.file.buffer.toString('base64');
+    const dataUrl = `data:${req.file.mimetype};base64,${base64Image}`;
+
+    res.json({
+      success: true,
+      imageUrl: dataUrl,
+      filename: req.file.originalname,
+      size: req.file.size,
+      mimetype: req.file.mimetype
+    });
+
+  } catch (error) {
+    console.error('Image upload error:', error);
+    res.status(500).json({
+      error: 'Failed to upload image',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
 }

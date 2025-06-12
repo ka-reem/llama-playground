@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import path from 'path';
-import { handleChatCompletion, handleGetModels, handleHealthCheck } from './routes';
+import { handleChatCompletion, handleGetModels, handleHealthCheck, handleImageUpload, uploadImage } from './routes';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -27,6 +27,7 @@ app.use((req, res, next) => {
 app.post('/api/chat/completions', handleChatCompletion);
 app.get('/api/models', handleGetModels);
 app.get('/api/health', handleHealthCheck);
+app.post('/api/upload-image', uploadImage, handleImageUpload);
 
 // Serve the frontend
 app.get('/', (req, res) => {

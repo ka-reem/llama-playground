@@ -314,6 +314,95 @@
             align-items: end;
         }
 
+        .input-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .uploaded-images {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        .uploaded-image {
+            position: relative;
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid rgba(102, 126, 234, 0.3);
+            cursor: pointer;
+        }
+
+        .uploaded-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .uploaded-image .remove-image {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 18px;
+            height: 18px;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #e53e3e;
+            transition: all 0.2s ease;
+        }
+
+        .uploaded-image .remove-image:hover {
+            background: white;
+            transform: scale(1.1);
+        }
+
+        .input-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .image-upload-button {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+            border: 2px solid rgba(102, 126, 234, 0.3);
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .image-upload-button:hover {
+            background: rgba(102, 126, 234, 0.2);
+            border-color: rgba(102, 126, 234, 0.5);
+            transform: translateY(-1px);
+        }
+
+        .image-upload-button:active {
+            transform: translateY(0);
+        }
+
+        .image-upload-input {
+            display: none;
+        }
+
         .message-input {
             flex: 1;
             padding: 16px 20px;
@@ -598,19 +687,39 @@
             
             <div class="input-container">
                 <form class="input-form" id="messageForm">
-                    <textarea 
-                        class="message-input" 
-                        id="messageInput" 
-                        placeholder="Type your message... (Shift+Enter for new line)"
-                        autocomplete="off"
-                        rows="1"
-                    ></textarea>
-                    <button type="submit" class="send-button" id="sendButton">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="22" y1="2" x2="11" y2="13"></line>
-                            <polygon points="22,2 15,22 11,13 2,9"></polygon>
-                        </svg>
-                    </button>
+                    <div class="input-area">
+                        <div class="uploaded-images" id="uploadedImages"></div>
+                        <textarea 
+                            class="message-input" 
+                            id="messageInput" 
+                            placeholder="Type your message... (Shift+Enter for new line)"
+                            autocomplete="off"
+                            rows="1"
+                        ></textarea>
+                    </div>
+                    <div class="input-controls">
+                        <input type="file" 
+                               class="image-upload-input" 
+                               id="imageUpload" 
+                               accept="image/*" 
+                               multiple>
+                        <button type="button" 
+                                class="image-upload-button" 
+                                id="imageUploadButton"
+                                title="Upload image">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                <polyline points="21,15 16,10 5,21"></polyline>
+                            </svg>
+                        </button>
+                        <button type="submit" class="send-button" id="sendButton">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22,2 15,22 11,13 2,9"></polygon>
+                            </svg>
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
@@ -623,9 +732,13 @@
         const sendButton = document.getElementById('sendButton');
         const modelSelect = document.getElementById('modelSelect');
         const streamToggle = document.getElementById('streamToggle');
+        const imageUpload = document.getElementById('imageUpload');
+        const imageUploadButton = document.getElementById('imageUploadButton');
+        const uploadedImages = document.getElementById('uploadedImages');
 
         let isLoading = false;
         let messages = [];
+        let currentImages = []; // Store uploaded images
 
         // Auto-resize textarea
         function autoResizeTextarea() {
@@ -644,6 +757,86 @@
         });
 
         messageInput.addEventListener('input', autoResizeTextarea);
+
+        // Image upload handling
+        imageUploadButton.addEventListener('click', () => {
+            imageUpload.click();
+        });
+
+        imageUpload.addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            
+            for (const file of files) {
+                if (file.size > 10 * 1024 * 1024) { // 10MB limit
+                    showError('Image size must be less than 10MB');
+                    continue;
+                }
+                
+                try {
+                    const imageUrl = await uploadImageFile(file);
+                    addImageToPreview(imageUrl, file.name);
+                } catch (error) {
+                    showError(`Failed to upload ${file.name}: ${error.message}`);
+                }
+            }
+            
+            // Clear the input
+            e.target.value = '';
+        });
+
+        async function uploadImageFile(file) {
+            const formData = new FormData();
+            formData.append('image', file);
+            
+            const response = await fetch('/api/upload-image', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Upload failed');
+            }
+            
+            const result = await response.json();
+            return result.imageUrl;
+        }
+
+        function addImageToPreview(imageUrl, filename) {
+            const imageContainer = document.createElement('div');
+            imageContainer.className = 'uploaded-image';
+            
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.alt = filename;
+            img.title = filename;
+            
+            const removeButton = document.createElement('button');
+            removeButton.className = 'remove-image';
+            removeButton.innerHTML = '×';
+            removeButton.onclick = () => {
+                const index = currentImages.findIndex(img => img.url === imageUrl);
+                if (index > -1) {
+                    currentImages.splice(index, 1);
+                }
+                imageContainer.remove();
+            };
+            
+            imageContainer.appendChild(img);
+            imageContainer.appendChild(removeButton);
+            uploadedImages.appendChild(imageContainer);
+            
+            // Store the image data
+            currentImages.push({
+                url: imageUrl,
+                filename: filename
+            });
+        }
+
+        function clearImagePreviews() {
+            uploadedImages.innerHTML = '';
+            currentImages = [];
+        }
 
         // Load models from API
         async function loadModels() {
@@ -677,7 +870,7 @@
             }
         }
 
-        function addMessage(content, role) {
+        function addMessage(content, role, images = []) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${role}`;
             
@@ -688,14 +881,66 @@
             const messageContent = document.createElement('div');
             messageContent.className = 'message-content';
             
-            // Simple markdown-like formatting
-            let formattedContent = content
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/`(.*?)`/g, '<code style="background: rgba(102,126,234,0.1); padding: 2px 4px; border-radius: 4px; font-family: monospace;">$1</code>')
-                .replace(/\n/g, '<br>');
+            // Add images if present
+            if (images && images.length > 0) {
+                const imagesContainer = document.createElement('div');
+                imagesContainer.style.cssText = 'display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;';
+                
+                images.forEach(image => {
+                    const imgElement = document.createElement('img');
+                    imgElement.src = image.url;
+                    imgElement.alt = image.filename || 'Uploaded image';
+                    imgElement.style.cssText = `
+                        max-width: 200px;
+                        max-height: 150px;
+                        border-radius: 8px;
+                        object-fit: cover;
+                        border: 1px solid rgba(0,0,0,0.1);
+                        cursor: pointer;
+                    `;
+                    imgElement.onclick = () => {
+                        // Create modal to show full image
+                        const modal = document.createElement('div');
+                        modal.style.cssText = `
+                            position: fixed;
+                            top: 0;
+                            left: 0;
+                            width: 100%;
+                            height: 100%;
+                            background: rgba(0,0,0,0.8);
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            z-index: 1000;
+                            cursor: pointer;
+                        `;
+                        const fullImg = document.createElement('img');
+                        fullImg.src = image.url;
+                        fullImg.style.cssText = 'max-width: 90%; max-height: 90%; border-radius: 8px;';
+                        modal.appendChild(fullImg);
+                        modal.onclick = () => modal.remove();
+                        document.body.appendChild(modal);
+                    };
+                    imagesContainer.appendChild(imgElement);
+                });
+                
+                messageContent.appendChild(imagesContainer);
+            }
             
-            messageContent.innerHTML = formattedContent;
+            // Add text content if present
+            if (content && content.trim()) {
+                const textDiv = document.createElement('div');
+                
+                // Simple markdown-like formatting
+                let formattedContent = content
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                    .replace(/`(.*?)`/g, '<code style="background: rgba(102,126,234,0.1); padding: 2px 4px; border-radius: 4px; font-family: monospace;">$1</code>')
+                    .replace(/\n/g, '<br>');
+                
+                textDiv.innerHTML = formattedContent;
+                messageContent.appendChild(textDiv);
+            }
             
             messageDiv.appendChild(avatar);
             messageDiv.appendChild(messageContent);
@@ -759,16 +1004,54 @@
             isLoading = true;
             sendButton.disabled = true;
             
-            // Add user message
-            addMessage(content, 'user');
-            messages.push({ role: 'user', content });
+            // Prepare message content
+            let messageContent;
+            const hasImages = currentImages.length > 0;
+            
+            if (hasImages) {
+                // Create multimodal message
+                messageContent = [];
+                
+                // Add text content if present
+                if (content && content.trim()) {
+                    messageContent.push({
+                        type: 'text',
+                        text: content
+                    });
+                }
+                
+                // Add images
+                currentImages.forEach(image => {
+                    messageContent.push({
+                        type: 'image_url',
+                        image_url: {
+                            url: image.url
+                        }
+                    });
+                });
+            } else {
+                // Simple text message
+                messageContent = content;
+            }
+            
+            // Add user message to UI
+            addMessage(content, 'user', hasImages ? currentImages : []);
+            
+            // Add to messages array
+            messages.push({ 
+                role: 'user', 
+                content: messageContent 
+            });
+            
+            // Clear uploaded images after sending
+            clearImagePreviews();
             
             const useStreaming = streamToggle.checked;
             
             if (useStreaming) {
-                await handleStreamingResponse(content);
+                await handleStreamingResponse();
             } else {
-                await handleRegularResponse(content);
+                await handleRegularResponse();
             }
             
             isLoading = false;
@@ -882,7 +1165,8 @@
             e.preventDefault();
             
             const content = messageInput.value.trim();
-            if (!content || isLoading) return;
+            // Allow sending if there's content OR images
+            if ((!content && currentImages.length === 0) || isLoading) return;
             
             messageInput.value = '';
             messageInput.style.height = 'auto'; // Reset height
